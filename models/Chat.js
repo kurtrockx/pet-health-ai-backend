@@ -7,7 +7,8 @@ const MessageSchema = new mongoose.Schema({
 });
 
 const ChatSchema = new mongoose.Schema({
-  chatId: String, // ✅ use this everywhere
+  chatId: String,
+  userId: String, // ✅ Make sure this exists
   title: String,
   messages: [MessageSchema],
   createdAt: Date,

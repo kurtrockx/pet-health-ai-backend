@@ -107,46 +107,50 @@ app.post("/api/llama3", async (req, res) => {
 
 // ========== CHAT HISTORY ==========
 app.get("/api/chatHistory", async (req, res) => {
+  const userId = req.query.userId;
+
+  if (!userId) {
+    return res.status(400).json({ error: "Missing userId" });
+  }
+
   try {
-    const chats = await Chat.find().sort({ updatedAt: -1 }).limit(20);
-    res.json({
-      chatHistory: chats.map((chat) => ({
-        chatId: chat.chatId, // Use chatId to stay consistent
-        title: chat.title || chat.messages[0]?.content || "Untitled Chat",
-        messages: chat.messages, // Should be in { role, content } format
-        lastUpdated: chat.updatedAt,
-      })),
-    });
-  } catch (error) {
-    console.error("Error fetching chat history:", error);
+    const chatHistory = await Chat.find({ userId }).sort({ updatedAt: -1 });
+    res.json({ chatHistory });
+  } catch (err) {
+    console.error("Error loading chat history:", err);
     res.status(500).json({ error: "Failed to load chat history" });
   }
 });
 
 app.post("/api/saveChat", async (req, res) => {
   try {
-    console.log("Incoming saveChat request:", req.body); // ✅ Check if it's received
+    const { chatId, title, messages, createdAt, updatedAt, userId } = req.body;
 
-    const { chatId, title, messages, timestamp, lastUpdated } = req.body;
+    if (!chatId || !messages || !userId) {
+      console.log("⛔ Missing fields:", { chatId, messages, userId });
+      return res.status(400).json({ error: "Missing required fields" });
+    }
 
-    await Chat.findOneAndUpdate(
-      { chatId },
+    let chat = await Chat.findOneAndUpdate(
+      { chatId, userId },
       {
         chatId,
-        messages,
         title,
-        updatedAt: new Date(lastUpdated || Date.now()),
-        createdAt: new Date(timestamp || Date.now()),
+        messages,
+        createdAt,
+        updatedAt,
+        userId,
       },
       { upsert: true, new: true }
     );
 
-    res.status(200).json({ message: "Chat saved" });
-  } catch (error) {
-    console.error("Error saving chat:", error);
-    res.status(500).json({ error: "Failed to save chat" });
+    return res.status(200).json({ message: "Chat saved", chat });
+  } catch (err) {
+    console.error("❌ Error saving chat:", err);
+    return res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
 // ========== START SERVER ==========
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
