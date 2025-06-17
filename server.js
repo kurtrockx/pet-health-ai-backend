@@ -107,18 +107,46 @@ app.post("/api/llama3", async (req, res) => {
 
 // ========== CHAT HISTORY ==========
 app.get("/api/chatHistory", async (req, res) => {
-  // Example using Mongoose
-  const chats = await Chat.find().sort({ updatedAt: -1 }).limit(20);
-  res.json({
-    chatHistory: chats.map((c) => ({
-      id: c.chatId,
-      title: c.messages[0]?.content || "Untitled Chat",
-      messages: c.messages,
-      lastUpdated: c.updatedAt,
-    })),
-  });
+  try {
+    const chats = await Chat.find().sort({ updatedAt: -1 }).limit(20);
+    res.json({
+      chatHistory: chats.map((chat) => ({
+        chatId: chat.chatId, // Use chatId to stay consistent
+        title: chat.title || chat.messages[0]?.content || "Untitled Chat",
+        messages: chat.messages, // Should be in { role, content } format
+        lastUpdated: chat.updatedAt,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching chat history:", error);
+    res.status(500).json({ error: "Failed to load chat history" });
+  }
 });
 
+app.post("/api/saveChat", async (req, res) => {
+  try {
+    console.log("Incoming saveChat request:", req.body); // ✅ Check if it's received
+
+    const { chatId, title, messages, timestamp, lastUpdated } = req.body;
+
+    await Chat.findOneAndUpdate(
+      { chatId },
+      {
+        chatId,
+        messages,
+        title,
+        updatedAt: new Date(lastUpdated || Date.now()),
+        createdAt: new Date(timestamp || Date.now()),
+      },
+      { upsert: true, new: true }
+    );
+
+    res.status(200).json({ message: "Chat saved" });
+  } catch (error) {
+    console.error("Error saving chat:", error);
+    res.status(500).json({ error: "Failed to save chat" });
+  }
+});
 // ========== START SERVER ==========
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

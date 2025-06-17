@@ -1,9 +1,17 @@
 import mongoose from "mongoose";
-const ChatSchema = new mongoose.Schema(
-  {
-    chatId: { type: String, unique: true },
-    messages: [{ role: String, content: String }],
-  },
-  { timestamps: true }
-);
+
+const MessageSchema = new mongoose.Schema({
+  content: String,
+  sender: String,
+  time: String,
+});
+
+const ChatSchema = new mongoose.Schema({
+  chatId: String, // ✅ use this everywhere
+  title: String,
+  messages: [MessageSchema],
+  createdAt: Date,
+  updatedAt: Date,
+});
+
 export default mongoose.model("Chat", ChatSchema);
