@@ -96,7 +96,7 @@ app.post("/api/llama3", async (req, res) => {
     const aiReply = await fetchLlama(chat.messages); // This is your LLM call
 
     chat.messages.push({ role: "assistant", content: aiReply });
-    chat.updatedAt = new Date(); // Ensure updatedAt is set
+    chat.updatedAt = new Date();
     await chat.save();
 
     res.json({ response: aiReply });
@@ -152,6 +152,9 @@ app.post("/api/saveChat", async (req, res) => {
   }
 });
 
+// ========== PET ROUTES ==========
+
+// ADD PET
 app.post("/api/addPet", async (req, res) => {
   try {
     const { petName, petType, breed, age, weight, gender, userId, imageUrl } =
@@ -165,7 +168,7 @@ app.post("/api/addPet", async (req, res) => {
       age,
       weight,
       gender,
-      imageUrl, // ✅ store URL from ImgBB
+      imageUrl,
     });
 
     await newPet.save();
@@ -176,12 +179,13 @@ app.post("/api/addPet", async (req, res) => {
   }
 });
 
+// GET PETS BY USER
 app.get("/api/pets", async (req, res) => {
   const { userId } = req.query;
   if (!userId) return res.status(400).json({ message: "Missing userId" });
 
   try {
-const pets = await Pet.find({ userId: String(req.query.userId) });
+    const pets = await Pet.find({ userId });
     res.json({ pets });
   } catch (err) {
     console.error("Error fetching pets:", err);
@@ -189,6 +193,48 @@ const pets = await Pet.find({ userId: String(req.query.userId) });
   }
 });
 
+// UPDATE PET
+app.put("/api/pets/:id", async (req, res) => {
+  try {
+    const petId = req.params.id;
+    const updatedPet = await Pet.findByIdAndUpdate(petId, req.body, {
+      new: true,
+    });
+
+    if (!updatedPet) {
+      return res.status(404).json({ message: "Pet not found" });
+    }
+
+    res.json({ pet: updatedPet });
+  } catch (err) {
+    console.error("Error updating pet:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// DELETE PET
+app.delete("/api/pets/:id", async (req, res) => {
+  const { id } = req.params;
+
+  // Optional: Validate the ID format
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "Invalid pet ID" });
+  }
+
+  try {
+    const result = await Pet.findByIdAndDelete(id);
+
+    if (!result) {
+      return res.status(404).json({ error: "Pet not found" });
+    }
+
+    res.json({ message: "Pet deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting pet:", err);
+    res.status(500).json({ error: "Failed to delete pet" });
+  }
+});
+// ========== PROFILE UPDATE ==========
 app.post("/api/updateProfile", async (req, res) => {
   try {
     const {
@@ -207,7 +253,6 @@ app.post("/api/updateProfile", async (req, res) => {
         .status(404)
         .json({ success: false, message: "User not found" });
 
-    // Password change (only if newPassword is provided)
     if (newPassword) {
       if (user.password !== currentPassword) {
         return res
@@ -217,7 +262,6 @@ app.post("/api/updateProfile", async (req, res) => {
       user.password = newPassword;
     }
 
-    // Name updates
     user.firstName = firstName || user.firstName;
     user.lastName = lastName || user.lastName;
     user.middleName = middleName || user.middleName;
@@ -243,7 +287,6 @@ app.post("/api/updateProfile", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
-
 
 // ========== START SERVER ==========
 const PORT = process.env.PORT || 3000;
