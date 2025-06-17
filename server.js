@@ -4,6 +4,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import User from "./models/User.js";
 import Chat from "./models/Chat.js";
+import Pet from "./models/Pet.js";
 import { fetchLlama } from "./aiService.js";
 
 dotenv.config();
@@ -148,6 +149,45 @@ app.post("/api/saveChat", async (req, res) => {
   } catch (err) {
     console.error("❌ Error saving chat:", err);
     return res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+app.post("/api/addPet", async (req, res) => {
+  try {
+    const { userId, petName, petType, breed, age, weight, gender } = req.body;
+
+    if (!userId || !petName || !petType) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    const newPet = new Pet({
+      userId: String(req.body.userId), // cast to string just to be safe
+      petName: req.body.petName,
+      petType,
+      breed,
+      age,
+      weight,
+      gender,
+    });
+
+    await newPet.save();
+    res.status(201).json({ message: "Pet added successfully", pet: newPet });
+  } catch (err) {
+    console.error("❌ Failed to add pet:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+app.get("/api/pets", async (req, res) => {
+  const { userId } = req.query;
+  if (!userId) return res.status(400).json({ message: "Missing userId" });
+
+  try {
+const pets = await Pet.find({ userId: String(req.query.userId) });
+    res.json({ pets });
+  } catch (err) {
+    console.error("Error fetching pets:", err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
