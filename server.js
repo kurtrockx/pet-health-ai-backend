@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 import cors from "cors";
 import dotenv from "dotenv";
 import User from "./models/User.js";
+import Chat from "./models/Chat.js";
+import { fetchLlama } from "./aiService.js";
 
 dotenv.config();
 
@@ -13,16 +15,15 @@ app.use(express.json());
 // Connect to MongoDB
 mongoose
   .connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch((err) => console.error("❌ MongoDB connection error:", err));
 
-// Register
+// ========== USER REGISTRATION ==========
 app.post("/api/register", async (req, res) => {
   try {
     const { lastName, firstName, middleName, ext, email, username, password } =
       req.body;
 
-    // Check if email or username already exists
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
       return res
@@ -39,8 +40,8 @@ app.post("/api/register", async (req, res) => {
       username,
       password,
     });
-    await newUser.save();
 
+    await newUser.save();
     res
       .status(201)
       .json({ success: true, message: "User registered successfully" });
@@ -50,22 +51,16 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
-// Login
+// ========== USER LOGIN ==========
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user) {
+    if (!user || user.password !== password) {
       return res
         .status(401)
-        .json({ success: false, message: "User not found" });
-    }
-
-    if (user.password !== password) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid password" });
+        .json({ success: false, message: "Invalid email or password" });
     }
 
     res.json({
@@ -85,6 +80,45 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// Start server
+// ========== AI CHAT ENDPOINT ==========
+app.post("/api/llama3", async (req, res) => {
+  const { chatId, message } = req.body;
+
+  try {
+    let chat = await Chat.findOne({ chatId });
+    if (!chat) {
+      chat = new Chat({ chatId, messages: [] });
+    }
+
+    chat.messages.push({ role: "user", content: message });
+
+    const aiReply = await fetchLlama(chat.messages); // This is your LLM call
+
+    chat.messages.push({ role: "assistant", content: aiReply });
+    chat.updatedAt = new Date(); // Ensure updatedAt is set
+    await chat.save();
+
+    res.json({ response: aiReply });
+  } catch (err) {
+    console.error("Chat error:", err);
+    res.status(500).json({ error: "Failed to get AI response" });
+  }
+});
+
+// ========== CHAT HISTORY ==========
+app.get("/api/chatHistory", async (req, res) => {
+  // Example using Mongoose
+  const chats = await Chat.find().sort({ updatedAt: -1 }).limit(20);
+  res.json({
+    chatHistory: chats.map((c) => ({
+      id: c.chatId,
+      title: c.messages[0]?.content || "Untitled Chat",
+      messages: c.messages,
+      lastUpdated: c.updatedAt,
+    })),
+  });
+});
+
+// ========== START SERVER ==========
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
