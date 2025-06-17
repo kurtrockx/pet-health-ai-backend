@@ -154,27 +154,25 @@ app.post("/api/saveChat", async (req, res) => {
 
 app.post("/api/addPet", async (req, res) => {
   try {
-    const { userId, petName, petType, breed, age, weight, gender } = req.body;
-
-    if (!userId || !petName || !petType) {
-      return res.status(400).json({ message: "Missing required fields" });
-    }
+    const { petName, petType, breed, age, weight, gender, userId, imageUrl } =
+      req.body;
 
     const newPet = new Pet({
-      userId: String(req.body.userId), // cast to string just to be safe
-      petName: req.body.petName,
+      userId,
+      petName,
       petType,
       breed,
       age,
       weight,
       gender,
+      imageUrl, // ✅ store URL from ImgBB
     });
 
     await newPet.save();
-    res.status(201).json({ message: "Pet added successfully", pet: newPet });
+    res.status(201).json({ pet: newPet });
   } catch (err) {
-    console.error("❌ Failed to add pet:", err);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error adding pet:", err);
+    res.status(500).json({ message: "Error adding pet" });
   }
 });
 
@@ -190,6 +188,62 @@ const pets = await Pet.find({ userId: String(req.query.userId) });
     res.status(500).json({ message: "Server error" });
   }
 });
+
+app.post("/api/updateProfile", async (req, res) => {
+  try {
+    const {
+      userId,
+      firstName,
+      lastName,
+      middleName,
+      ext,
+      currentPassword,
+      newPassword,
+    } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user)
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+
+    // Password change (only if newPassword is provided)
+    if (newPassword) {
+      if (user.password !== currentPassword) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Current password is incorrect" });
+      }
+      user.password = newPassword;
+    }
+
+    // Name updates
+    user.firstName = firstName || user.firstName;
+    user.lastName = lastName || user.lastName;
+    user.middleName = middleName || user.middleName;
+    user.ext = ext || user.ext;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Profile updated successfully",
+      user: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        middleName: user.middleName,
+        ext: user.ext,
+        email: user.email,
+        username: user.username,
+      },
+    });
+  } catch (err) {
+    console.error("❌ Error updating profile:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
 
 // ========== START SERVER ==========
 const PORT = process.env.PORT || 3000;
